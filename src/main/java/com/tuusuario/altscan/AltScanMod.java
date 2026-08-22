@@ -12,7 +12,6 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.UUID;
 
 public class AltScanMod implements ModInitializer {
 
@@ -28,8 +27,9 @@ public class AltScanMod implements ModInitializer {
                     .then(Commands.literal("on").executes(ctx -> {
                         CommandSourceStack source = ctx.getSource();
                         MinecraftServer server = source.getServer();
-                        UUID playerUUID = source.getPlayer().getUUID();
-                        if (!server.getPlayerList().isOp(playerUUID)) {
+                        ServerPlayer player = source.getPlayer();
+                        // Comprobar si es operador usando la lista de ops
+                        if (!server.getPlayerList().getOpList().contains(player.getGameProfile())) {
                             source.sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
                             return 0;
                         }
@@ -44,8 +44,8 @@ public class AltScanMod implements ModInitializer {
                     .then(Commands.literal("off").executes(ctx -> {
                         CommandSourceStack source = ctx.getSource();
                         MinecraftServer server = source.getServer();
-                        UUID playerUUID = source.getPlayer().getUUID();
-                        if (!server.getPlayerList().isOp(playerUUID)) {
+                        ServerPlayer player = source.getPlayer();
+                        if (!server.getPlayerList().getOpList().contains(player.getGameProfile())) {
                             source.sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
                             return 0;
                         }
@@ -87,6 +87,7 @@ public class AltScanMod implements ModInitializer {
             return;
         }
 
+        // Ejecutar el comando usando la fuente del servidor
         server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "alts " + name);
     }
 }

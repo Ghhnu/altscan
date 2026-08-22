@@ -4,12 +4,14 @@ import com.mojang.brigadier.Command;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.command.CommandOutput;
+import net.minecraft.commands.CommandSource;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.command.CommandManager;
-import net.minecraft.server.command.ServerCommandSource;
-import net.minecraft.server.network.ServerPlayerEntity;
-import net.minecraft.text.Text;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.Vec2;
+import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -26,11 +28,15 @@ import java.util.Deque;
  *
  * Requiere permiso de operador (nivel 3) para usarlo, igual que /alts.
  * No implementa el comando "alts" en sí: asume que otro plugin/mod ya lo
- * añade a tu servidor (tú ya confirmaste que tienes acceso a él).
+ * añade a tu servidor.
+ *
+ * Nota sobre nombres de clases: desde Minecraft 26.1, Fabric usa los
+ * nombres oficiales de Mojang directamente (ServerPlayer, Component,
+ * CommandSourceStack...) en vez de los nombres "Yarn" de versiones
+ * anteriores (ServerPlayerEntity, Text, ServerCommandSource...).
  */
 public class AltScanMod implements ModInitializer {
 
-    // Cola de jugadores pendientes de escanear
     private final Deque<String> pendingNames = new ArrayDeque<>();
     private boolean scanning = false;
 
@@ -41,34 +47,34 @@ public class AltScanMod implements ModInitializer {
     @Override
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
-            dispatcher.register(CommandManager.literal("altscan")
-                    .requires(src -> src.hasPermissionLevel(3))
-                    .then(CommandManager.literal("on").executes(ctx -> {
+            dispatcher.register(Commands.literal("altscan")
+                    .requires(src -> src.hasPermission(3))
+                    .then(Commands.literal("on").executes(ctx -> {
                         MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
-                        ctx.getSource().sendFeedback(
-                                () -> Text.literal("[AltScan] Escaneo iniciado sobre " + server.getPlayerManager().getPlayerList().size() + " jugador(es)."),
+                        int count = server.getPlayerList().getPlayers().size();
+                        ctx.getSource().sendSuccess(
+                                () -> Component.literal("[AltScan] Escaneo iniciado sobre " + count + " jugador(es)."),
                                 false
                         );
                         return Command.SINGLE_SUCCESS;
                     }))
-                    .then(CommandManager.literal("off").executes(ctx -> {
+                    .then(Commands.literal("off").executes(ctx -> {
                         stopScan();
-                        ctx.getSource().sendFeedback(() -> Text.literal("[AltScan] Escaneo detenido/cancelado."), false);
+                        ctx.getSource().sendSuccess(() -> Component.literal("[AltScan] Escaneo detenido/cancelado."), false);
                         return Command.SINGLE_SUCCESS;
                     }))
             );
         });
 
         // Procesamos la cola poco a poco en cada tick del servidor para no
-        // saturar de comandos de golpe (y para no chocar con cooldowns del
-        // plugin que provee /alts si los tuviera).
+        // saturar de comandos de golpe.
         ServerTickEvents.END_SERVER_TICK.register(this::onServerTick);
     }
 
     private void startScan(MinecraftServer server) {
         pendingNames.clear();
-        for (ServerPlayerEntity player : server.getPlayerManager().getPlayerList()) {
+        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             pendingNames.add(player.getGameProfile().getName());
         }
         scanning = !pendingNames.isEmpty();
@@ -90,7 +96,7 @@ public class AltScanMod implements ModInitializer {
         String name = pendingNames.poll();
         if (name == null) {
             scanning = false;
-            server.getPlayerManager().broadcast(Text.literal("[AltScan] Escaneo completo."), false);
+            server.getPlayerList().broadcastSystemMessage(Component.literal("[AltScan] Escaneo completo."), false);
             return;
         }
 
@@ -98,38 +104,48 @@ public class AltScanMod implements ModInitializer {
     }
 
     private void runAltsCheck(MinecraftServer server, String playerName) {
-        // CommandOutput personalizado: en vez de mandar la respuesta solo a
+        // CommandSource personalizado: en vez de mandar la respuesta solo a
         // consola, la reenviamos al chat de todo el server con el prefijo
-        // [AltScan] para que la veas sin mirar la consola.
-        CommandOutput broadcastOutput = new CommandOutput() {
+        // [AltScan].
+        CommandSource broadcastOutput = new CommandSource() {
             @Override
-            public void sendMessage(Text message) {
-                server.getPlayerManager().broadcast(
-                        Text.literal("[AltScan] ").append(message), false
+            public void sendSystemMessage(Component message) {
+                server.getPlayerList().broadcastSystemMessage(
+                        Component.literal("[AltScan] ").append(message), false
                 );
             }
 
             @Override
-            public boolean shouldReceiveFeedback() {
+            public boolean acceptsSuccess() {
                 return true;
             }
 
             @Override
-            public boolean shouldTrackOutput() {
+            public boolean acceptsFailure() {
                 return true;
             }
 
             @Override
-            public boolean shouldBroadcastConsoleToOps() {
+            public boolean shouldInformAdmins() {
                 return false;
             }
         };
 
-        // Usamos la fuente de comandos del propio servidor (permiso nivel 4)
-        // envuelta con nuestro output, así el comando "alts" se ejecuta con
-        // permisos de sobra sin depender de que tú estés conectado.
-        ServerCommandSource altsSource = server.getCommandSource().withOutput(broadcastOutput);
+        // Construimos una fuente de comandos equivalente a la del propio
+        // servidor (permiso nivel 4), pero con nuestro CommandSource que
+        // reenvía la respuesta al chat.
+        CommandSourceStack altsSource = new CommandSourceStack(
+                broadcastOutput,
+                Vec3.ZERO,
+                Vec2.ZERO,
+                server.overworld(),
+                4,
+                "AltScan",
+                Component.literal("AltScan"),
+                server,
+                null
+        );
 
-        server.getCommandManager().executeWithPrefix(altsSource, "alts " + playerName);
+        server.getCommands().performPrefixedCommand(altsSource, "alts " + playerName);
     }
 }

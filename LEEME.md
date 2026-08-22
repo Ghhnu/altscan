@@ -1,66 +1,74 @@
 # AltScan — instrucciones
 
-## 1. Genera la base del proyecto (recomendado)
+Este .zip ya es un proyecto Gradle/Fabric COMPLETO (no una plantilla a
+medias): tiene `build.gradle`, `settings.gradle`, `gradle.properties`,
+el código del mod y el workflow de GitHub Actions. No hace falta
+descargar nada de fabricmc.net ni fusionar archivos.
 
-Como Minecraft ha cambiado a versionado por año (26.1, 26.2...) y las
-versiones de Loom/Gradle/Fabric API cambian a menudo, lo más fiable es
-generar tú mismo la plantilla oficial con las versiones exactas de tu
-servidor, y luego pegar encima los 2 archivos de este paquete:
+Versiones fijadas ahora mismo (Minecraft 26.1.2):
+- Fabric Loader 0.19.3
+- Fabric Loom 1.17-SNAPSHOT
+- Fabric API 0.155.2+26.1.2
+- Java 25
 
-1. Ve a https://fabricmc.net/develop/template/
-2. Elige la versión de Minecraft de tu servidor (la real, revisa con
-   `/version` en consola o mira el jar del server).
-3. Marca solo "Dedicated Server" como entorno (o "Client and Server" si
-   quieres poder probarlo en singleplayer también).
-4. Descarga el zip generado y descomprímelo.
+Si tu servidor usa otra versión de Minecraft, edita `gradle.properties`
+con los valores de https://fabricmc.net/develop (y si cambia el Java
+requerido, ajusta también `sourceCompatibility`/`targetCompatibility`
+en `build.gradle` y `java-version` en `.github/workflows/build.yml`).
 
-## 2. Copia los archivos de este paquete
+## 1. Sube el proyecto a GitHub
 
-Sustituye/añade dentro de esa plantilla descargada:
-
-- `src/main/java/com/tuusuario/altscan/AltScanMod.java`
-- `src/main/resources/fabric.mod.json` (si la plantilla ya trae uno,
-  fusiona el `entrypoints` y el `depends` con el tuyo, no lo borres entero)
-
-Si quieres, cambia el paquete `com.tuusuario.altscan` por el tuyo propio
-(y ajusta la ruta de carpetas igual).
-
-## 3. Compila el .jar
-
-Desde la carpeta del proyecto:
+Desde la carpeta `altscan/` (la raíz, donde está `build.gradle`):
 
 ```
-./gradlew build
+git init
+git add .
+git commit -m "AltScan inicial"
+git branch -M main
+git remote add origin https://github.com/TU_USUARIO/TU_REPO.git
+git push -u origin main
 ```
 
-(en Windows: `gradlew.bat build`)
+## 2. Deja que GitHub Actions compile el .jar
 
-El .jar final aparece en `build/libs/altscan-1.0.0.jar`.
+En cuanto hagas el push, la pestaña Actions de tu repo lanzará el
+workflow "Build AltScan" solo. Espera a que salga el check verde,
+ábrelo, y al final de la página encontrarás el artifact
+"altscan-jar" — descárgalo y descomprímelo, dentro está tu
+altscan-1.0.0.jar.
 
-## 4. Instálalo en el servidor
+(El workflow instala Gradle 9.4.0 él mismo en el runner, así que NO
+depende de un gradlew local — no hace falta que exista ese archivo
+en el repo.)
 
-1. Asegúrate de que el servidor ya tiene **Fabric Loader** instalado y
-   **Fabric API** puesto en la carpeta `mods/` (AltScan depende de ella).
-2. Copia `altscan-1.0.0.jar` también a la carpeta `mods/` del servidor.
+## 3. Instálalo en el servidor
+
+1. Asegúrate de que el servidor ya tiene Fabric Loader instalado y
+   Fabric API puesto en la carpeta mods/.
+2. Copia altscan-1.0.0.jar también a mods/.
 3. Reinicia el servidor.
 
-## 5. Uso
+## 4. Uso
 
-- `/altscan on` → escanea una vez a todos los jugadores conectados en ese
-  momento, ejecutando `alts <nombre>` por cada uno con ~0.5s de separación,
-  y publica cada resultado en el chat con el prefijo `[AltScan]`.
-- `/altscan off` → cancela el escaneo si aún no ha terminado de recorrer
-  a todos los jugadores.
+- /altscan on -> escanea una vez a todos los jugadores conectados en
+  ese momento, ejecutando "alts <nombre>" por cada uno (con ~0.5s de
+  separación entre jugador y jugador), y publica cada resultado en el
+  chat con el prefijo [AltScan].
+- /altscan off -> cancela el escaneo si aún no ha terminado.
 
-Requiere nivel de permiso de operador 3 (el mismo nivel típico de comandos
-de staff), igual que ya tienes para `/alts`.
+Requiere permiso de operador nivel 3, igual que ya tienes para /alts.
+
+## Si quieres compilarlo también en tu PC (opcional)
+
+Necesitas Gradle 9.x instalado localmente (o generar el wrapper una
+vez con "gradle wrapper" si tienes Gradle instalado). No es necesario
+para que funcione el workflow de GitHub, solo para probarlo en local
+antes de subirlo.
 
 ## Notas
 
-- El comando se llama `/altscan` (no `/alts`) a propósito, para no chocar
-  con el `/alts <nombre>` que ya te da tu otro plugin.
-- El ritmo entre jugador y jugador (`TICKS_BETWEEN_CHECKS` en el código,
-  10 ticks = medio segundo) es ajustable si el plugin de `/alts` tiene
-  cooldown propio y necesitas ir más despacio.
-- Si tu servidor es realmente survival vanilla, no supermodded, este mod
-  no toca nada del gameplay: solo añade el comando.
+- El comando se llama /altscan (no /alts) a propósito, para no
+  chocar con el /alts <nombre> que ya te da tu otro plugin.
+- El ritmo entre jugador y jugador (TICKS_BETWEEN_CHECKS en
+  AltScanMod.java, 10 ticks = medio segundo) es ajustable si el
+  plugin de /alts tiene cooldown propio.

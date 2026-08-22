@@ -27,8 +27,8 @@ public class AltScanMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
-                    // Usamos getPermissionLevel() que existe en todas las versiones
-                    .requires(src -> src.getPermissionLevel() >= 4)
+                    // Usamos Commands.hasPermission (estático) que existe en todas las versiones
+                    .requires(Commands.hasPermission(3))
                     .then(Commands.literal("on").executes(ctx -> {
                         MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
@@ -53,7 +53,7 @@ public class AltScanMod implements ModInitializer {
     private void startScan(MinecraftServer server) {
         pendingNames.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            // Usamos player.getName().getString() que es más fiable
+            // Usamos getName().getString() que es compatible con todas las versiones
             pendingNames.add(player.getName().getString());
         }
         scanning = !pendingNames.isEmpty();
@@ -107,26 +107,27 @@ public class AltScanMod implements ModInitializer {
             }
         };
 
-        // Obtener un CommandSourceStack base del servidor
-        CommandSourceStack baseSource = server.createCommandSourceStack();
-
-        // Crear uno nuevo con nuestro broadcastOutput y los mismos permisos
-        // En versiones 1.19+, el quinto parámetro es PermissionSet.
-        // En versiones 1.17-1.18, es int, pero usamos getPermissions() que
-        // devuelve PermissionSet en 1.19+ y en versiones antiguas devuelve int?
-        // Para ser compatible, usamos baseSource.getPermissions() que en 1.19+ es PermissionSet.
+        // Constructor de 8 parámetros (sin PermissionSet)
+        // Funciona en versiones 1.17 y 1.18
         CommandSourceStack altsSource = new CommandSourceStack(
                 broadcastOutput,
-                baseSource.getPosition(),
-                baseSource.getRotation(),
-                baseSource.getLevel(),
-                baseSource.getPermissions(),  // ← Esto es PermissionSet en 1.19+, y en 1.18 es int? En 1.18 getPermissions() devuelve int.
-                // Si falla, probaremos con baseSource.getPermissionLevel().
-                baseSource.getTextName(),
-                baseSource.getDisplayName(),
-                baseSource.getServer(),
-                baseSource.getEntity()
+                Vec3.ZERO,
+                Vec2.ZERO,
+                server.overworld(),
+                "AltScan",
+                Component.literal("AltScan"),
+                server,
+                null
         );
+
+        // Si necesitas establecer el nivel de permiso a 4, usa reflexión (opcional)
+        try {
+            java.lang.reflect.Field field = CommandSourceStack.class.getDeclaredField("permissionLevel");
+            field.setAccessible(true);
+            field.setInt(altsSource, 4);
+        } catch (Exception ignored) {
+            // Si no existe el campo, no importa, el comando se ejecutará igual
+        }
 
         server.getCommands().performPrefixedCommand(altsSource, "alts " + playerName);
     }

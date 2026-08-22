@@ -27,8 +27,15 @@ public class AltScanMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
-                    // USAR 3 como en el original, o 4
-                    .requires(src -> src.hasPermission(3))
+                    // SOLUCIÓN: Usar hasPermission(4) si existe, o fallback con nivel 4
+                    .requires(src -> {
+                        try {
+                            return src.hasPermission(4);
+                        } catch (NoSuchMethodError e) {
+                            // Fallback para versiones antiguas: siempre permitir a operadores
+                            return src.getServer().getPlayerList().isOp(src.getPlayer().getGameProfile());
+                        }
+                    })
                     .then(Commands.literal("on").executes(ctx -> {
                         MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
@@ -53,7 +60,6 @@ public class AltScanMod implements ModInitializer {
     private void startScan(MinecraftServer server) {
         pendingNames.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            // Usar getGameProfile().getName() como en el original
             pendingNames.add(player.getGameProfile().getName());
         }
         scanning = !pendingNames.isEmpty();
@@ -107,17 +113,21 @@ public class AltScanMod implements ModInitializer {
             }
         };
 
-        // SOLUCIÓN: Usar el constructor de 9 parámetros con int directamente
+        // SOLUCIÓN DEFINITIVA: Usar createCommandSourceStack() y luego withPermission()
+        // Este método existe en todas las versiones modernas de Fabric
+        CommandSourceStack baseSource = server.createCommandSourceStack();
+        
+        // Crear un nuevo CommandSourceStack con nuestro broadcastOutput y permiso 4
         CommandSourceStack altsSource = new CommandSourceStack(
                 broadcastOutput,
-                Vec3.ZERO,
-                Vec2.ZERO,
-                server.overworld(),
-                4,  // Nivel de permiso como int (no PermissionSet)
-                "AltScan",
-                Component.literal("AltScan"),
-                server,
-                null
+                baseSource.getPosition(),
+                baseSource.getRotation(),
+                baseSource.getLevel(),
+                4,  // Nivel de permiso (int)
+                baseSource.getTextName(),
+                baseSource.getDisplayName(),
+                baseSource.getServer(),
+                baseSource.getEntity()
         );
 
         server.getCommands().performPrefixedCommand(altsSource, "alts " + playerName);

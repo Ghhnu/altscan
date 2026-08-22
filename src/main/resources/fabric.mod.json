@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "altscan",
+  "version": "1.0.0",
+  "name": "AltScan",
+  "description": "Ejecuta /alts <jugador> automáticamente para todos los jugadores conectados y muestra el resultado en el chat.",
+  "authors": ["TuNombre"],
+  "environment": "server",
+  "entrypoints": {
+    "main": [
+      "com.tuusuario.altscan.AltScanMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.16.0",
+    "fabric-api": "*",
+    "minecraft": "*"
+  }
+}

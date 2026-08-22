@@ -4,7 +4,6 @@ import com.mojang.brigadier.Command;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
@@ -25,32 +24,18 @@ public class AltScanMod implements ModInitializer {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
                     .then(Commands.literal("on").executes(ctx -> {
-                        CommandSourceStack source = ctx.getSource();
-                        MinecraftServer server = source.getServer();
-                        ServerPlayer player = source.getPlayer();
-                        // Comprobar si es operador usando la lista de ops
-                        if (!server.getPlayerList().getOpList().contains(player.getGameProfile())) {
-                            source.sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
-                            return 0;
-                        }
+                        MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
                         int count = server.getPlayerList().getPlayers().size();
-                        source.sendSuccess(
+                        ctx.getSource().sendSuccess(
                                 () -> Component.literal("[AltScan] Escaneo iniciado sobre " + count + " jugador(es)."),
                                 false
                         );
                         return Command.SINGLE_SUCCESS;
                     }))
                     .then(Commands.literal("off").executes(ctx -> {
-                        CommandSourceStack source = ctx.getSource();
-                        MinecraftServer server = source.getServer();
-                        ServerPlayer player = source.getPlayer();
-                        if (!server.getPlayerList().getOpList().contains(player.getGameProfile())) {
-                            source.sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
-                            return 0;
-                        }
                         stopScan();
-                        source.sendSuccess(() -> Component.literal("[AltScan] Escaneo detenido/cancelado."), false);
+                        ctx.getSource().sendSuccess(() -> Component.literal("[AltScan] Escaneo detenido/cancelado."), false);
                         return Command.SINGLE_SUCCESS;
                     }))
             );
@@ -87,7 +72,10 @@ public class AltScanMod implements ModInitializer {
             return;
         }
 
-        // Ejecutar el comando usando la fuente del servidor
-        server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "alts " + name);
+        // Ejecutar el comando /alts usando la fuente del servidor (tiene permisos de OP)
+        server.getCommands().performPrefixedCommand(
+                server.createCommandSourceStack(),
+                "alts " + name
+        );
     }
 }

@@ -24,9 +24,13 @@ public class AltScanMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
-                    // Usamos un predicado que comprueba si el que ejecuta es operador
-                    .requires(src -> src.getServer().getPlayerList().isOp(src.getPlayer().getGameProfile()))
+                    // Sin .requires() para evitar problemas de tipos
                     .then(Commands.literal("on").executes(ctx -> {
+                        // Comprobar si es operador (nivel 4)
+                        if (!ctx.getSource().hasPermission(4)) {
+                            ctx.getSource().sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
+                            return 0;
+                        }
                         MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
                         int count = server.getPlayerList().getPlayers().size();
@@ -37,6 +41,10 @@ public class AltScanMod implements ModInitializer {
                         return Command.SINGLE_SUCCESS;
                     }))
                     .then(Commands.literal("off").executes(ctx -> {
+                        if (!ctx.getSource().hasPermission(4)) {
+                            ctx.getSource().sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
+                            return 0;
+                        }
                         stopScan();
                         ctx.getSource().sendSuccess(() -> Component.literal("[AltScan] Escaneo detenido/cancelado."), false);
                         return Command.SINGLE_SUCCESS;

@@ -21,7 +21,7 @@ jobs:
       - name: Instalar y ejecutar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '9.4.0'
+          gradle-version: '9.5.1'
 
       - name: Compilar
         run: gradle build --no-daemon

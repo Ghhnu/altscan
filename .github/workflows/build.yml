@@ -12,17 +12,19 @@ jobs:
       - name: Descargar el código
         uses: actions/checkout@v4
 
-      - name: Instalar JDK
+      - name: Instalar JDK 25
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '21'   # súbelo a 25 si tu Minecraft 26.x lo pide
+          java-version: '25'
 
-      - name: Dar permisos a gradlew
-        run: chmod +x ./gradlew
+      - name: Instalar y ejecutar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.4.0'
 
       - name: Compilar
-        run: ./gradlew build
+        run: gradle build --no-daemon
 
       - name: Subir el .jar como artifact descargable
         uses: actions/upload-artifact@v4

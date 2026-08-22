@@ -12,6 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.UUID;
 
 public class AltScanMod implements ModInitializer {
 
@@ -24,29 +25,32 @@ public class AltScanMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
-                    // Sin .requires() para evitar problemas de tipos
                     .then(Commands.literal("on").executes(ctx -> {
-                        // Comprobar si es operador (nivel 4)
-                        if (!ctx.getSource().hasPermission(4)) {
-                            ctx.getSource().sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
+                        CommandSourceStack source = ctx.getSource();
+                        MinecraftServer server = source.getServer();
+                        UUID playerUUID = source.getPlayer().getUUID();
+                        if (!server.getPlayerList().isOp(playerUUID)) {
+                            source.sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
                             return 0;
                         }
-                        MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
                         int count = server.getPlayerList().getPlayers().size();
-                        ctx.getSource().sendSuccess(
+                        source.sendSuccess(
                                 () -> Component.literal("[AltScan] Escaneo iniciado sobre " + count + " jugador(es)."),
                                 false
                         );
                         return Command.SINGLE_SUCCESS;
                     }))
                     .then(Commands.literal("off").executes(ctx -> {
-                        if (!ctx.getSource().hasPermission(4)) {
-                            ctx.getSource().sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
+                        CommandSourceStack source = ctx.getSource();
+                        MinecraftServer server = source.getServer();
+                        UUID playerUUID = source.getPlayer().getUUID();
+                        if (!server.getPlayerList().isOp(playerUUID)) {
+                            source.sendFailure(Component.literal("Necesitas ser operador para usar este comando."));
                             return 0;
                         }
                         stopScan();
-                        ctx.getSource().sendSuccess(() -> Component.literal("[AltScan] Escaneo detenido/cancelado."), false);
+                        source.sendSuccess(() -> Component.literal("[AltScan] Escaneo detenido/cancelado."), false);
                         return Command.SINGLE_SUCCESS;
                     }))
             );
@@ -83,7 +87,6 @@ public class AltScanMod implements ModInitializer {
             return;
         }
 
-        // Ejecutar el comando usando el CommandSourceStack del servidor
         server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "alts " + name);
     }
 }

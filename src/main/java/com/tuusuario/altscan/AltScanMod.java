@@ -27,15 +27,8 @@ public class AltScanMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
-                    // SOLUCIÓN: Usar hasPermission(4) si existe, o fallback con nivel 4
-                    .requires(src -> {
-                        try {
-                            return src.hasPermission(4);
-                        } catch (NoSuchMethodError e) {
-                            // Fallback para versiones antiguas: siempre permitir a operadores
-                            return src.getServer().getPlayerList().isOp(src.getPlayer().getGameProfile());
-                        }
-                    })
+                    // Usamos getPermissionLevel() que existe en todas las versiones
+                    .requires(src -> src.getPermissionLevel() >= 4)
                     .then(Commands.literal("on").executes(ctx -> {
                         MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
@@ -60,7 +53,8 @@ public class AltScanMod implements ModInitializer {
     private void startScan(MinecraftServer server) {
         pendingNames.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            pendingNames.add(player.getGameProfile().getName());
+            // Usamos player.getName().getString() que es más fiable
+            pendingNames.add(player.getName().getString());
         }
         scanning = !pendingNames.isEmpty();
         tickCounter = 0;
@@ -113,17 +107,21 @@ public class AltScanMod implements ModInitializer {
             }
         };
 
-        // SOLUCIÓN DEFINITIVA: Usar createCommandSourceStack() y luego withPermission()
-        // Este método existe en todas las versiones modernas de Fabric
+        // Obtener un CommandSourceStack base del servidor
         CommandSourceStack baseSource = server.createCommandSourceStack();
-        
-        // Crear un nuevo CommandSourceStack con nuestro broadcastOutput y permiso 4
+
+        // Crear uno nuevo con nuestro broadcastOutput y los mismos permisos
+        // En versiones 1.19+, el quinto parámetro es PermissionSet.
+        // En versiones 1.17-1.18, es int, pero usamos getPermissions() que
+        // devuelve PermissionSet en 1.19+ y en versiones antiguas devuelve int?
+        // Para ser compatible, usamos baseSource.getPermissions() que en 1.19+ es PermissionSet.
         CommandSourceStack altsSource = new CommandSourceStack(
                 broadcastOutput,
                 baseSource.getPosition(),
                 baseSource.getRotation(),
                 baseSource.getLevel(),
-                4,  // Nivel de permiso (int)
+                baseSource.getPermissions(),  // ← Esto es PermissionSet en 1.19+, y en 1.18 es int? En 1.18 getPermissions() devuelve int.
+                // Si falla, probaremos con baseSource.getPermissionLevel().
                 baseSource.getTextName(),
                 baseSource.getDisplayName(),
                 baseSource.getServer(),

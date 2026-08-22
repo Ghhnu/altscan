@@ -4,14 +4,11 @@ import com.mojang.brigadier.Command;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
-import net.minecraft.commands.CommandSource;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.phys.Vec2;
-import net.minecraft.world.phys.Vec3;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -27,8 +24,8 @@ public class AltScanMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
-                    // Usamos Commands.hasPermission (estático) que existe en todas las versiones
-                    .requires(Commands.hasPermission(3))
+                    // Usamos un predicado que comprueba si el que ejecuta es operador
+                    .requires(src -> src.getServer().getPlayerList().isOp(src.getPlayer().getGameProfile()))
                     .then(Commands.literal("on").executes(ctx -> {
                         MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
@@ -53,7 +50,6 @@ public class AltScanMod implements ModInitializer {
     private void startScan(MinecraftServer server) {
         pendingNames.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            // Usamos getName().getString() que es compatible con todas las versiones
             pendingNames.add(player.getName().getString());
         }
         scanning = !pendingNames.isEmpty();
@@ -79,56 +75,7 @@ public class AltScanMod implements ModInitializer {
             return;
         }
 
-        runAltsCheck(server, name);
-    }
-
-    private void runAltsCheck(MinecraftServer server, String playerName) {
-        CommandSource broadcastOutput = new CommandSource() {
-            @Override
-            public void sendSystemMessage(Component message) {
-                server.getPlayerList().broadcastSystemMessage(
-                        Component.literal("[AltScan] ").append(message), false
-                );
-            }
-
-            @Override
-            public boolean acceptsSuccess() {
-                return true;
-            }
-
-            @Override
-            public boolean acceptsFailure() {
-                return true;
-            }
-
-            @Override
-            public boolean shouldInformAdmins() {
-                return false;
-            }
-        };
-
-        // Constructor de 8 parámetros (sin PermissionSet)
-        // Funciona en versiones 1.17 y 1.18
-        CommandSourceStack altsSource = new CommandSourceStack(
-                broadcastOutput,
-                Vec3.ZERO,
-                Vec2.ZERO,
-                server.overworld(),
-                "AltScan",
-                Component.literal("AltScan"),
-                server,
-                null
-        );
-
-        // Si necesitas establecer el nivel de permiso a 4, usa reflexión (opcional)
-        try {
-            java.lang.reflect.Field field = CommandSourceStack.class.getDeclaredField("permissionLevel");
-            field.setAccessible(true);
-            field.setInt(altsSource, 4);
-        } catch (Exception ignored) {
-            // Si no existe el campo, no importa, el comando se ejecutará igual
-        }
-
-        server.getCommands().performPrefixedCommand(altsSource, "alts " + playerName);
+        // Ejecutar el comando usando el CommandSourceStack del servidor
+        server.getCommands().performPrefixedCommand(server.createCommandSourceStack(), "alts " + name);
     }
 }

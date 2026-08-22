@@ -27,7 +27,8 @@ public class AltScanMod implements ModInitializer {
     public void onInitialize() {
         CommandRegistrationCallback.EVENT.register((dispatcher, registryAccess, environment) -> {
             dispatcher.register(Commands.literal("altscan")
-                    .requires(src -> src.hasPermission(4))
+                    // USAR 3 como en el original, o 4
+                    .requires(src -> src.hasPermission(3))
                     .then(Commands.literal("on").executes(ctx -> {
                         MinecraftServer server = ctx.getSource().getServer();
                         startScan(server);
@@ -52,7 +53,8 @@ public class AltScanMod implements ModInitializer {
     private void startScan(MinecraftServer server) {
         pendingNames.clear();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            pendingNames.add(player.getName().getString());
+            // Usar getGameProfile().getName() como en el original
+            pendingNames.add(player.getGameProfile().getName());
         }
         scanning = !pendingNames.isEmpty();
         tickCounter = 0;
@@ -105,15 +107,13 @@ public class AltScanMod implements ModInitializer {
             }
         };
 
-        // Crear CommandSourceStack con el nivel de permisos del servidor
-        int permissionLevel = server.getOperatorUserPermissionLevel();
-        
+        // SOLUCIÓN: Usar el constructor de 9 parámetros con int directamente
         CommandSourceStack altsSource = new CommandSourceStack(
                 broadcastOutput,
                 Vec3.ZERO,
                 Vec2.ZERO,
                 server.overworld(),
-                permissionLevel,
+                4,  // Nivel de permiso como int (no PermissionSet)
                 "AltScan",
                 Component.literal("AltScan"),
                 server,
